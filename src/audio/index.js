@@ -1,4 +1,5 @@
 import {getAudioMediaStream} from './util';
+import {init} from 'echarts';
 
 export class Recorder {
 
@@ -10,12 +11,11 @@ export class Recorder {
         this.input = this.context.createMediaStreamSource(this.mediaStream);
 
         this.analyser = this.context.createAnalyser();
-        this.analyser.fftSize = 32;
+        this.analyser.fftSize = 256;
         this.processor = this.context.createScriptProcessor(4096, 2, 2);
 
-        
         this.gain = this.context.createGain();
-        this.gain.gain.value = 30;
+        this.gain.gain.value = 1;
 
         this.analyser.connect(this.context.destination);
 
@@ -23,7 +23,9 @@ export class Recorder {
             let bufferLength = this.analyser.frequencyBinCount;
             let dataArray = new Uint8Array(bufferLength);
             this.analyser.getByteFrequencyData(dataArray);
-            console.log(dataArray);
+            // console.log(dataArray);
+
+            this.ondata(dataArray);
         };
         this.nodes = [
             this.input,
@@ -44,9 +46,42 @@ export class Recorder {
 
     }
 
+    ondata() {
+    }
+
 }
 
-export async function getRecorder() {
-    let recorer = new Recorder();
-    return await recorer.init();
+function initEcharts(node) {
+    return init(node);
+}
+
+function getOptions(data = []) {
+    return {
+        xAxis: {
+            type: 'category',
+            data: (new Array(data.length)).fill(0)
+        },
+        yAxis: {
+            type: 'value',
+            min: 0,
+            max: 256
+        },
+        series: [{
+            data,
+            type: 'bar'
+        }]
+    };
+
+}
+
+export async function getRecorder(node) {
+    let chart = initEcharts(node);
+    let recorder = new Recorder();
+    recorder.ondata = function (data) {
+        let arr = Array.from(data);
+        let option = getOptions(arr);
+        chart.setOption(option);
+        console.log(arr);
+    }
+    return await recorder.init();
 }
