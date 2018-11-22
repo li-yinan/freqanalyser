@@ -1,5 +1,6 @@
 import {
     sleep,
+    genPoint,
     getAudioMediaStream
 } from './util';
 import echarts from 'echarts';
@@ -18,7 +19,7 @@ export class Recorder {
         this.input = this.context.createMediaStreamSource(this.mediaStream);
 
         this.analyser = this.context.createAnalyser();
-        this.analyser.fftSize = 2048;
+        this.analyser.fftSize = 32;
         this.analyser.smoothingTimeConstant = 0;
 
         this.gain = this.context.createGain();
@@ -121,7 +122,9 @@ export async function init(node) {
 }
 
 export async function run() {
-    let arr = [100, 200, 500, 1000, 2000, 5000, 10000, 20000];
+    // let arr = [100, 200, 500, 1000, 2000, 5000, 10000, 20000];
+    let arr = genPoint(40);
+    console.log(arr);
     let graphArr = [];
     for (var i = 0; i < arr.length; i++) {
         console.log('playing ',arr[i]);
