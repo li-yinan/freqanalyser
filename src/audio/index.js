@@ -1,61 +1,91 @@
-import {getAudioMediaStream} from './util';
-import {init} from 'echarts';
+import {
+    sleep,
+    getAudioMediaStream
+} from './util';
+import echarts from 'echarts';
 
 export class Recorder {
 
     async init() {
         this.context = new AudioContext();
-        // this.node = this.context.createScriptProcessor(4096, 2, 2);
+        await this.createRecordNodes();
+        await this.createPlayNodes();
+    }
+    
+    async createRecordNodes() {
         this.mediaStream= await getAudioMediaStream();
 
         this.input = this.context.createMediaStreamSource(this.mediaStream);
 
         this.analyser = this.context.createAnalyser();
-        this.analyser.fftSize = 256;
-        this.processor = this.context.createScriptProcessor(4096, 2, 2);
+        this.analyser.fftSize = 2048;
+        this.analyser.smoothingTimeConstant = 0;
 
         this.gain = this.context.createGain();
         this.gain.gain.value = 1;
 
-        this.analyser.connect(this.context.destination);
 
-        this.processor.onaudioprocess = e => {
-            let bufferLength = this.analyser.frequencyBinCount;
-            let dataArray = new Uint8Array(bufferLength);
-            this.analyser.getByteFrequencyData(dataArray);
-            // console.log(dataArray);
-
-            this.ondata(dataArray);
-        };
-        this.nodes = [
+        this.connect([
             this.input,
             this.gain,
             this.analyser,
-            this.processor,
-            this.context.destination
-        ];
+        ]);
 
-        for (var i = 0; i < this.nodes.length; i++) {
-            let from = this.nodes[i];
-            let to = this.nodes[i + 1];
+    }
+
+    async createPlayNodes() {
+        this.oscillator = this.context.createOscillator();
+        this.oscillator.start();
+        this.connect([
+            this.oscillator,
+            this.context.destination
+        ]);
+    }
+
+    play(hz) {
+        this.oscillator.frequency.value = hz;
+    }
+
+    stop() {
+        this.oscillator.stop();
+    }
+
+    connect(nodes) {
+        for (var i = 0; i < nodes.length; i++) {
+            let from = nodes[i];
+            let to = nodes[i + 1];
             if (from && to) {
                 from.connect(to);
             }
         }
+    }
 
+    getFreqArr() {
+        let bufferLength = this.analyser.frequencyBinCount;
+        let dataArray = new Uint8Array(bufferLength);
+        this.analyser.getByteFrequencyData(dataArray);
+        return Array.from(dataArray);
 
     }
 
-    ondata() {
+    async getFreqValue(freq) {
+        let sampleRate = this.context.sampleRate;
+        let fbc = this.analyser.frequencyBinCount;
+        let unit = sampleRate / fbc;
+        this.play(freq);
+        await sleep(1000);
+        let freqArr = this.getFreqArr();
+        let index = parseInt(freq / unit, 10);
+        return freqArr[index];
     }
 
 }
 
 function initEcharts(node) {
-    return init(node);
+    return echarts.init(node);
 }
 
-function getOptions(data = []) {
+function getOptions(x = [], data = []) {
     return {
         xAxis: {
             type: 'category',
@@ -74,14 +104,44 @@ function getOptions(data = []) {
 
 }
 
-export async function getRecorder(node) {
-    let chart = initEcharts(node);
-    let recorder = new Recorder();
-    recorder.ondata = function (data) {
-        let arr = Array.from(data);
-        let option = getOptions(arr);
-        chart.setOption(option);
-        console.log(arr);
+let recorder;
+let chart;
+
+export async function init(node) {
+    recorder = new Recorder();
+    chart = initEcharts(node);
+
+    await recorder.init();
+    // setInterval(() => {
+    //     let arr = recorder.getFreqArr();
+    //     let option = getOptions(arr);
+    //     chart.setOption(option);
+    //     // console.log(arr);
+    // }, 200);
+}
+
+export async function run() {
+    let arr = [100, 200, 500, 1000, 2000, 5000, 10000, 20000];
+    let graphArr = [];
+    for (var i = 0; i < arr.length; i++) {
+        console.log('playing ',arr[i]);
+        let value = await recorder.getFreqValue(arr[i]);
+        graphArr.push(value);
     }
-    return await recorder.init();
+    console.log(graphArr);
+    chart.setOption({
+        xAxis: {
+            type: 'category',
+            data: arr
+        },
+        yAxis: {
+            type: 'value'
+        },
+        series: [{
+            data: graphArr,
+            type: 'line',
+            smooth: true
+        }]
+    });
+    return;
 }

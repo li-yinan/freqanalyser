@@ -1,13 +1,13 @@
 <template>
   <div class="hello">
     <div ref="main" class="echarts"></div>
-    <button @click="handleClick">click</button>
+    <button @click="init">init</button>
+    <button @click="run">run</button>
   </div>
 </template>
 
 <script>
-import {getRecorder} from '../audio/index';
-import {init} from 'echarts';
+import {init, run} from '../audio/index';
 export default {
   name: 'HelloWorld',
   data () {
@@ -18,9 +18,12 @@ export default {
   async created() {
   },
   methods: {
-      async handleClick() {
+      async init() {
           let node = this.$refs.main;
-          let recorder = await getRecorder(node);
+          await init(node);
+      },
+      async run() {
+          await run();
       }
   }
 
